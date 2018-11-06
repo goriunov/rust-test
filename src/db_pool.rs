@@ -3,8 +3,6 @@ use std::ops::Deref;
 use diesel::prelude::*;
 use diesel::r2d2::ConnectionManager;
 
-use r2d2::*;
-
 pub type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
 pub struct DbConn(pub r2d2::PooledConnection<ConnectionManager<PgConnection>>);
 
@@ -16,7 +14,7 @@ impl Deref for DbConn {
 }
 
 pub fn init_pool() -> Pool {
-  let db = "postgres://postgres@localhost:5433";
+  let db = "postgres://postgres:123@localhost:5432";
   let manager = ConnectionManager::<PgConnection>::new(db);
   Pool::new(manager).expect("db pool")
 }

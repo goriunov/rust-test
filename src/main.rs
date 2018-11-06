@@ -6,80 +6,76 @@ extern crate r2d2;
 extern crate tokio;
 extern crate tokio_threadpool;
 
-use futures::{future, future::poll_fn, Async, Poll};
-
-use hyper::rt::{Future, Stream};
-use hyper::service::service_fn;
-use hyper::{Body, Method, Request, Response, Server, StatusCode};
+use futures::{future, Future, Poll};
 
 use diesel::prelude::*;
+use hyper::service::service_fn;
+use hyper::{Body, Method, Request, Response, Server, StatusCode};
 
 pub mod db_pool;
 pub mod models;
 pub mod schema;
 
 use self::db_pool::*;
+use self::models::NewPost;
+use schema::posts;
 
-static NOTFOUND: &[u8] = b"Not Found";
+static NOT_FOUND: &[u8] = b"Not Found";
 type BoxFut = Box<Future<Item = Response<Body>, Error = hyper::Error> + Send>;
 
-// struct ReadPost {
-//   conn: PgConnection,
-// }
+struct PutPost {
+  pool: Pool,
+  new_post: NewPost,
+}
 
-// impl Future for ReadPost {
-//   type Item = String;
-//   type Error = ();
-
-//   fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-//     // self.conn.execute(query: &str, params: &[&ToSql])
-//     tokio::spawn(poll_fn(move || {
-//       tokio_threadpool::blocking(|| {
-//         // execute read from sql
-//       })
-//       .unwrap();
-//       Ok(Async::Ready(()))
-//     }));
-
-//     Ok(Async::Ready("I am testing hello world".to_string()))
-//   }
-// }
-
-struct HelloWorld;
-
-impl Future for HelloWorld {
-  type Item = String;
+impl Future for PutPost {
+  type Item = ();
   type Error = ();
 
   fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-    println!("Has been pooled");
-    Ok(Async::Ready("I am testing hello world".to_string()))
+    let db_connection = &*get_conn(&self.pool).unwrap();
+
+    tokio_threadpool::blocking(|| {
+      diesel::insert_into(posts::table)
+        .values(&self.new_post)
+        .execute(db_connection)
+        .unwrap();
+
+      // uncomment next line to speed up everything
+      // println!("Print me");
+    }).map_err(|e| {
+      println!("Got error in thread {:?}", e);
+    })
   }
 }
 
 fn http_handler(req: Request<Body>, db_pool: &Pool) -> BoxFut {
   let mut response = Response::new(Body::empty());
-  let db_connection = get_conn(db_pool);
 
-  println!("Has been connecet");
   match (req.method(), req.uri().path()) {
     (&Method::GET, "/") => {
-      let fut = HelloWorld {};
+      let put_post = PutPost {
+        pool: db_pool.clone(),
+        new_post: NewPost {
+          title: String::from("Hello world"),
+          body: String::from("Hope it works"),
+        },
+      };
 
-      let reversed = fut
-        .and_then(move |hello_world| {
-          *response.body_mut() = Body::from(hello_world);
+      let new_post_insert = put_post
+        .and_then(|_| {
+          *response.body_mut() = Body::from("We should have put everything properly");
           Ok(response)
         }).or_else(|_| {
           Ok(
             Response::builder()
               .status(StatusCode::NOT_FOUND)
-              .body(NOTFOUND.into())
+              .body(NOT_FOUND.into())
               .unwrap(),
           )
         });
 
-      return Box::new(reversed);
+      return Box::new(new_post_insert);
     }
     _ => {
       *response.status_mut() = StatusCode::NOT_FOUND;
@@ -103,5 +99,5 @@ fn main() {
     .map_err(|e| eprintln!("server error: {}", e));
 
   println!("Listening on http://{}", addr);
-  hyper::rt::run(server);
+  tokio::run(server);
 }
