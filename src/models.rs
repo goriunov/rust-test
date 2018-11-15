@@ -1,4 +1,4 @@
-use schema::posts;
+use crate::schema::posts;
 
 #[derive(Queryable, Clone, Debug)]
 pub struct Post {

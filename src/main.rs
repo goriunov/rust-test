@@ -18,7 +18,7 @@ pub mod schema;
 
 use self::db_pool::*;
 use self::models::NewPost;
-use schema::posts;
+use self::schema::posts;
 
 static NOT_FOUND: &[u8] = b"Not Found";
 type BoxFut = Box<Future<Item = Response<Body>, Error = hyper::Error> + Send>;
@@ -86,7 +86,7 @@ fn http_handler(req: Request<Body>, db_pool: &Pool) -> BoxFut {
 }
 
 fn main() {
-  let addr = ([127, 0, 0, 1], 3000).into();
+  let addr = ([0, 0, 0, 0], 3000).into();
   let db_poll = init_pool();
 
   let new_service = move || {

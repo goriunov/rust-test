@@ -14,7 +14,7 @@ impl Deref for DbConn {
 }
 
 pub fn init_pool() -> Pool {
-  let db = "postgres://postgres:123@localhost:5432";
+  let db = "postgres://pg:123@209.97.163.93:5432/pgdb";
   let manager = ConnectionManager::<PgConnection>::new(db);
   Pool::new(manager).expect("db pool")
 }
